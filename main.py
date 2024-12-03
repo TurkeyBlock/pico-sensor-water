@@ -15,9 +15,11 @@ WATER_SENSOR_PIN = 1 #GP1
 
 # Zabbix server details
 ZABBIX_SERVER_IP = ''
-ZABBIX_SERVER_PORT = 10051 #Listener port
-HOST = 'pico-sensor'
+ZABBIX_SERVER_PORT = 10051 #Listener port for
+ZABBIX_SCRIPT_PORT = 10052 #Listener port for requests
+HOST = 'pico-sensor'       #Unique host name
 WATER_KEY = 'water_key'
+CRAC_KEY = 'crac_key'
 
 
 def connect_to_wlan():
@@ -59,6 +61,12 @@ def water_sensor():
     water_data = machine.Pin(WATER_SENSOR_PIN, machine.Pin.IN)
     is_water = water_data.value()
     return is_water
+    
+def crac_switch():
+    #Read switch pin; returns 0 for no override and 1 for disable CRAC unit.
+    #Needs to be filled in.
+    temp_switch_value = 0
+    return temp_switch_value
 
 def send_data_to_zabbix_server(zabbix_server_ip, zabbix_server_port, host, key, value):
     # Create socket object
@@ -102,7 +110,25 @@ def send_data_to_zabbix_server(zabbix_server_ip, zabbix_server_port, host, key, 
     # Parse response and return result
     response_json = json.loads(response[13:])
     return response_json['info']
+
+#I *believe* a new socket connection is neccessary, as the Zabbix trap does not appear
+# to be able to send information back after triggering the relevant script.
+def request_data_from_zabbix_server(zabbix_server_ip, script_port):
+    # Create socket object
+    # AF_INET sets to IPv4 and SOCK_STREAM sets to TCP
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    print('a')
+    # Connect to server script
+    s.connect((zabbix_server_ip, script_port))
+    print('b')
     
+    requested_data = s.recv(1024)
+
+    print(requested_data)
+    # Close socket
+    s.close()
+
+    return requested_data
 
 def main():
     # Connect to wifi, return wlan object to check if still connected in while loop
@@ -121,6 +147,9 @@ def main():
         try:
             # Read water sensor
             is_water = water_sensor()
+
+            #Read CRAC-unit switch
+            is_on = crac_switch()
             
             # Added 2 x 1 second timers to not overload Pico
             # These split the sensor logic and each send_data_to_zabbix_server
@@ -128,18 +157,36 @@ def main():
             
             # Send water sensor value to  Zabbix server
             result = send_data_to_zabbix_server(ZABBIX_SERVER_IP, ZABBIX_SERVER_PORT, HOST, WATER_KEY, is_water)
+            
             print(f'Water sensor value: {is_water}')
             print('Result:', result)
             time.sleep(1)
-            
-            #===
-            #Planning to add here a wait-for-response from script hosted on the Zabbix server. (Remember to reopen Socket)
-            #===
-            
+
+            #Send CRAC unit status to Zabbix server
+            result = send_data_to_zabbix_server(ZABBIX_SERVER_IP, ZABBIX_SERVER_PORT, HOST, CRAC_KEY, is_on)
+
+            print(f'Water sensor value: {is_water}')
+            print('Result:', result)
+            time.sleep(1)
         except Exception as e:
-            print(f'An error has occured: {e}')
+            print(f'An error has occured while reporting to Zabbix: {e}')
             print('retrying... ')
             
+        tries = 0
+        connected_to_script = False
+        #Yes, tries could be set to 10 on success. No, don't do that.
+        while(tries < 10 and connected_to_script == False):
+            tries = tries + 1
+            try:
+                #Request CRAC instructions from the Zabbix script
+                result = request_data_from_zabbix_server(ZABBIX_SERVER_IP, ZABBIX_SCRIPT_PORT)
+                #Do whatever with the result. (Turn off CRAC unit)
+            except Exception as e:
+                print(f'An error has occured while requesting from Zabbix: {e}')
+                print('retrying... ')
+            
+        #End of while, sleep (seconds) to save battery.
+        time.sleep(10)
 
 if __name__ == '__main__':
     main()
