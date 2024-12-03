@@ -96,10 +96,6 @@ def send_data_to_zabbix_server(zabbix_server_ip, zabbix_server_port, host, key, 
     response = s.recv(1024)
     print(response)
 
-    #===
-    #Planning to add here a wait-for-response from script hosted on the Zabbix server.
-    #===
-    
     # Close socket
     s.close()
 
@@ -135,6 +131,10 @@ def main():
             print(f'Water sensor value: {is_water}')
             print('Result:', result)
             time.sleep(1)
+            
+            #===
+            #Planning to add here a wait-for-response from script hosted on the Zabbix server. (Remember to reopen Socket)
+            #===
             
         except Exception as e:
             print(f'An error has occured: {e}')
