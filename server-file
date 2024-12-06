@@ -1,0 +1,26 @@
+import time
+import socket
+
+# Creating a socket object
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+print ("Socket successfully created")
+
+# Get local Host machine name
+host = socket.gethostname()
+port = 10052
+
+# Bind to port
+s.bind((host, port))
+
+# Queue up to 5 requests
+s.listen(5)
+print ("socket is listening")  
+
+#Continues to run until interrupt or error.
+while True:
+    # establish connection
+    clientSocket, addr = s.accept()
+    print("got a connection from %s" % str(addr))
+    currentTime = time.ctime(time.time()) + "\r\n"
+    clientSocket.send(currentTime.encode('ascii'))
+    clientSocket.close()
