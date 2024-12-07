@@ -1,48 +1,20 @@
 import time
 import socket
+import mysql.connector
 
-class Pico:
-    def __init__(self, id, water_found, override_permitted):
-        self.id = id
-        self.force_off = water_found and override_permitted
-
-    #Picos are equal if they share an ID (It's the same Pico)
-    def __eq__(self, other):
-        return self.id == other.id
-
-    def update(water_found, override_permitted):
-        force_off = water_found and override_permitted
-
-    def get_print_string() -> str:
-        return id+" "+force_off
-
-#List of picos defined by Zabbix server that were caught in trap.
-pico_list = []
-
-#Attempt to add/update picos caught in Zabbix trap
-def zabbix_trapped_pico(id:int, water_found:bool, override_permitted:bool):
-    Trapped_pico = Pico(id, (water_found and override_permitted))
-
-    for pico in pico_list:
-        #Equivalent IDs, not the same item
-        if Trapped_pico == pico:
-            pico.update(water_found, override_permitted)
-            del Trapped_pico
+#####################
+try:
+    database = mysql.connector.connect(user = 'zabbix', password = 'password', host = '127.0.0.1', database='zabbix')
+except mysql.connector.Error as err:
+    if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+        print("Pico-Script: Something is wrong with MySQL user name or password")
+    elif err.errno == errorcode.ER_BAD_DB_ERROR:
+        print("Pico-Script: Database does not exist")
     else:
-        pico_list.append(Trapped_pico)
-        pico_list.sort(key=lambda p: p.id) #Personal preference
-    
+        print(err)
+    exit()
+#####################
 
-def print_picos():
-    print_string = ""
-    divider-string = " | "
-    for i in pico_list:
-        print_string+=i.get_print_string()
-        print_string+= divider_string
-    if print_string:
-       print_string = print-string[:len(print_string)-len(divider_string)]
-    print(print_string)
-        
 # Creating a socket object
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 print ("Socket successfully created")
@@ -63,6 +35,37 @@ while True:
     # establish connection
     clientSocket, addr = s.accept()
     print("got a connection from %s" % str(addr))
+
+    #Send connection confirmation.
     currentTime = time.ctime(time.time()) + "\r\n"
     clientSocket.send(currentTime.encode('ascii'))
+
+    #Recieve 
+    response = clientSocket.recv(1024)
+    host = 'pico' #Parse the hostname from response
+    key = 'water_key' #Parse the key from response
+
+    cursor = database.cursor()
+
+    #Query SQL database for the water value of Pico AND its HVAC override permissions
+    #hostid is findable w/ SELECT hostid FROM hosts WHERE host = /host/
+    #confirm that hostid uses this water_key: SELECT hostid FROM items WHERE key_ = 'water_key';
+    #most recent value from trapper = SELECT value FROM history_uint WHERE itemid = '12345' order by clock desc limit 1;
+    
+    #Request most recently trapped value for corresponding host and key.
+    query = ("SELECT value FROM history_uint WHERE itemid = (SELECT itemid FROM items WHERE hostid = (SELECT hostid FROM hosts WHERE host = %s ) AND key_ = %s) order by clock desc limit 1;")
+    cursor.execute(query, (host, key))
+
+    #Search was Limit 1, so... I'm assuming the results are stored in a list.
+    print(cursor[0])
+
+    cursor.close()
+
+    #Send whatever information back
+    currentTime = time.ctime(time.time()) + "\r\n"
+    clientSocket.send(currentTime.encode('ascii'))    
+    
     clientSocket.close()
+
+#Unreachable reminder
+database.close()
