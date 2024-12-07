@@ -1,6 +1,48 @@
 import time
 import socket
 
+class Pico:
+    def __init__(self, id, water_found, override_permitted):
+        self.id = id
+        self.force_off = water_found and override_permitted
+
+    #Picos are equal if they share an ID (It's the same Pico)
+    def __eq__(self, other):
+        return self.id == other.id
+
+    def update(water_found, override_permitted):
+        force_off = water_found and override_permitted
+
+    def get_print_string() -> str:
+        return id+" "+force_off
+
+#List of picos defined by Zabbix server that were caught in trap.
+pico_list = []
+
+#Attempt to add/update picos caught in Zabbix trap
+def zabbix_trapped_pico(id:int, water_found:bool, override_permitted:bool):
+    Trapped_pico = Pico(id, (water_found and override_permitted))
+
+    for pico in pico_list:
+        #Equivalent IDs, not the same item
+        if Trapped_pico == pico:
+            pico.update(water_found, override_permitted)
+            del Trapped_pico
+    else:
+        pico_list.append(Trapped_pico)
+        pico_list.sort(key=lambda p: p.id) #Personal preference
+    
+
+def print_picos():
+    print_string = ""
+    divider-string = " | "
+    for i in pico_list:
+        print_string+=i.get_print_string()
+        print_string+= divider_string
+    if print_string:
+       print_string = print-string[:len(print_string)-len(divider_string)]
+    print(print_string)
+        
 # Creating a socket object
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 print ("Socket successfully created")
