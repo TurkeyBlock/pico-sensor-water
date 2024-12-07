@@ -121,10 +121,17 @@ def request_data_from_zabbix_server(zabbix_server_ip, script_port):
     # Connect to server script
     s.connect((zabbix_server_ip, script_port))
     print('b')
-    
-    requested_data = s.recv(1024)
 
+    #Recieve connection confirmation
+    requested_data = s.recv(1024)
     print(requested_data)
+
+    #Send HOST (name of pi pico)
+
+    #Recieve instructions
+    requested_data = s.recv(1024)
+    print(requested_data)
+    
     # Close socket
     s.close()
 
@@ -162,12 +169,12 @@ def main():
             print('Result:', result)
             time.sleep(1)
 
-            #Send CRAC unit status to Zabbix server
-            result = send_data_to_zabbix_server(ZABBIX_SERVER_IP, ZABBIX_SERVER_PORT, HOST, CRAC_KEY, is_on)
+            #Send CRAC unit override status to Zabbix server
+            #result = send_data_to_zabbix_server(ZABBIX_SERVER_IP, ZABBIX_SERVER_PORT, HOST, CRAC_KEY, is_on)
 
-            print(f'Water sensor value: {is_water}')
-            print('Result:', result)
-            time.sleep(1)
+            #print(f'CRAC override value: {is_on}')
+            #print('Result:', result)
+        
         except Exception as e:
             print(f'An error has occured while reporting to Zabbix: {e}')
             print('retrying... ')
@@ -176,11 +183,16 @@ def main():
         connected_to_script = False
         #Yes, tries could be set to 10 on success. No, don't do that.
         while(tries < 10 and connected_to_script == False):
+            time.sleep(1)
             tries = tries + 1
             try:
                 #Request CRAC instructions from the Zabbix script
-                result = request_data_from_zabbix_server(ZABBIX_SERVER_IP, ZABBIX_SCRIPT_PORT)
+                #Host is being used to check identity, Key is the relevant trapper in MySQL
+                result = request_data_from_zabbix_server(ZABBIX_SERVER_IP, ZABBIX_SCRIPT_PORT, HOST, WATER_KEY)
+                
                 #Do whatever with the result. (Turn off CRAC unit)
+
+                connected_to_script = True
             except Exception as e:
                 print(f'An error has occured while requesting from Zabbix: {e}')
                 print('retrying... ')
