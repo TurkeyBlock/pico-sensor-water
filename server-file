@@ -17,10 +17,10 @@ except mysql.connector.Error as err:
 
 # Creating a socket object
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-print ("Socket successfully created")
+print ("Pico-Script: Socket successfully created")
 
-# Get local Host machine name
-host = socket.gethostname()
+# Accept *any* host connections
+host = ''
 port = 10052
 
 # Bind to port
@@ -28,7 +28,8 @@ s.bind((host, port))
 
 # Queue up to 5 requests
 s.listen(5)
-print ("socket is listening")  
+print ("Pico-Script: socket is listening on port %s" %str(port))  
+print ("Pico-Script: socket is listening for host %s" %str(host))  
 
 #Continues to run until interrupt or error.
 while True:
@@ -38,16 +39,18 @@ while True:
 
     #Send connection confirmation.
     currentTime = time.ctime(time.time()) + "\r\n"
-    clientSocket.send(currentTime.encode('ascii'))
+    clientSocket.sendall(currentTime.encode('ascii'))
 
-    #Recieve 
+    #Recieve, delimiter is a NULbyte
     response = clientSocket.recv(1024)
-    host = 'pico' #Parse the hostname from response
-    key = 'water_key' #Parse the key from response
+    response_string_list = response.decode('utf-8', errors='ignore').split('\x00')
+    
+    host = response_string_list[0]
+    key = response_string_list[1]
 
     cursor = database.cursor()
 
-    #Query SQL database for the water value of Pico AND its HVAC override permissions
+    #Query SQL database for the water value of Pico
     #hostid is findable w/ SELECT hostid FROM hosts WHERE host = /host/
     #confirm that hostid uses this water_key: SELECT hostid FROM items WHERE key_ = 'water_key';
     #most recent value from trapper = SELECT value FROM history_uint WHERE itemid = '12345' order by clock desc limit 1;
@@ -56,15 +59,14 @@ while True:
     query = ("SELECT value FROM history_uint WHERE itemid = (SELECT itemid FROM items WHERE hostid = (SELECT hostid FROM hosts WHERE host = %s ) AND key_ = %s) order by clock desc limit 1;")
     cursor.execute(query, (host, key))
 
-    #Search was Limit 1, so... I'm assuming the results are stored in a list.
-    print(cursor[0])
-
+    #Fetch & print value from cursor
+    #Not currently altering the returned water value. Will at some point.
+    return_value = str(cursor.fetchone()[0])
     cursor.close()
 
     #Send whatever information back
-    currentTime = time.ctime(time.time()) + "\r\n"
-    clientSocket.send(currentTime.encode('ascii'))    
-    
+    clientSocket.sendall(bytes(return_value, 'utf-8'))
+    print(return_value)
     clientSocket.close()
 
 #Unreachable reminder
