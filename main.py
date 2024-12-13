@@ -113,7 +113,7 @@ def send_data_to_zabbix_server(zabbix_server_ip, zabbix_server_port, host, key, 
 
 #I *believe* a new socket connection is neccessary, as the Zabbix trap does not appear
 # to be able to send information back after triggering the relevant script.
-def request_data_from_zabbix_server(zabbix_server_ip, script_port):
+def request_data_from_zabbix_server(zabbix_server_ip, script_port, host, key):
     # Create socket object
     # AF_INET sets to IPv4 and SOCK_STREAM sets to TCP
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -125,17 +125,20 @@ def request_data_from_zabbix_server(zabbix_server_ip, script_port):
     #Recieve connection confirmation
     requested_data = s.recv(1024)
     print(requested_data)
-
-    #Send HOST (name of pi pico)
-
+    
+    #Send HOST (name of pi pico) & key
+    data_to_send = bytes(host, 'utf-8') + b'\x00' + bytes(key, 'utf-8')
+    s.sendall(data_to_send)
+    
     #Recieve instructions
     requested_data = s.recv(1024)
-    print(requested_data)
+    return_value = requested_data.decode()
+    print(return_value)
     
     # Close socket
     s.close()
 
-    return requested_data
+    return return_value
 
 def main():
     # Connect to wifi, return wlan object to check if still connected in while loop
